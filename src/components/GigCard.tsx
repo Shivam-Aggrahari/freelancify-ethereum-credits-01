@@ -7,7 +7,7 @@ import { formatDistanceToNow } from "date-fns";
 import { useAuth } from "@/context/AuthContext";
 import { GigApplication } from "@/components/GigApplication";
 import { Link } from "react-router-dom";
-import { Briefcase } from "lucide-react";
+import { Briefcase, User } from "lucide-react";
 
 interface GigCardProps {
   gig: Gig;
@@ -73,8 +73,8 @@ export function GigCard({ gig, onApply, myGig = false }: GigCardProps) {
           {myGig ? (
             <Link to={`/gig/${gig.id}/applications`}>
               <Button variant="secondary" className="flex items-center gap-1">
-                <Briefcase className="h-4 w-4 mr-1" />
-                Manage
+                <User className="h-4 w-4 mr-1" />
+                {gig.status === "open" ? "View Applications" : "Manage"}
               </Button>
             </Link>
           ) : (

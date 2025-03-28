@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
+import { Loader2, Send } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/ui/use-toast";
 import { useNavigate } from "react-router-dom";
@@ -130,15 +130,19 @@ export function GigApplication({ gigId, onApply, showApplyButton = false }: GigA
         onClick={handleQuickApply} 
         disabled={isApplying}
         size="sm"
-        className="ml-2"
+        variant="primary"
+        className="flex items-center gap-1"
       >
         {isApplying ? (
           <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            <Loader2 className="h-4 w-4 animate-spin" />
             Applying...
           </>
         ) : (
-          "Quick Apply"
+          <>
+            <Send className="h-4 w-4" />
+            Apply
+          </>
         )}
       </Button>
     );
