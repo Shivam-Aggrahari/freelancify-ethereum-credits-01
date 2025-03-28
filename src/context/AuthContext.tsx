@@ -3,6 +3,8 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { useToast } from "@/components/ui/use-toast";
 import { Web3Service } from "@/services/web3Service";
 import { User } from "@/types/user";
+import { supabase } from "@/integrations/supabase/client";
+import { Session } from "@supabase/supabase-js";
 
 interface AuthContextType {
   user: User | null;
@@ -12,67 +14,146 @@ interface AuthContextType {
   disconnectWallet: () => void;
   loginWithGoogle: () => Promise<void>;
   updateProfile: (profileData: Partial<User>) => Promise<void>;
+  session: Session | null;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
   
   useEffect(() => {
-    // Check if user is already connected
-    const checkConnection = async () => {
-      try {
-        const web3Service = new Web3Service();
-        const isConnected = await web3Service.isConnected();
+    // Set up auth state listener FIRST
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, newSession) => {
+        console.log("Auth state changed:", event, newSession);
+        setSession(newSession);
         
-        if (isConnected) {
-          const address = await web3Service.getAddress();
-          // In a real app, you would fetch user data from your backend here
-          const mockUser = {
-            id: "1",
-            address,
-            username: `user_${address.substring(2, 8)}`,
-            credits: 100,
-            skills: [],
-            education: [],
-            links: {},
-          };
-          setUser(mockUser);
+        if (newSession?.user) {
+          // Defer fetching profile to avoid Supabase subscription deadlock
+          setTimeout(() => {
+            fetchUserProfile(newSession.user.id);
+          }, 0);
+        } else {
+          setUser(null);
         }
-      } catch (error) {
-        console.error("Error checking connection:", error);
-      } finally {
+      }
+    );
+    
+    // THEN check for existing session
+    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+      setSession(currentSession);
+      
+      if (currentSession?.user) {
+        fetchUserProfile(currentSession.user.id);
+      } else {
         setIsLoading(false);
       }
-    };
+    });
     
-    checkConnection();
+    return () => subscription.unsubscribe();
   }, []);
+  
+  const fetchUserProfile = async (userId: string) => {
+    try {
+      setIsLoading(true);
+      
+      // Fetch user profile from Supabase
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+      
+      if (error) {
+        throw error;
+      }
+      
+      if (profile) {
+        // Fetch user skills
+        const { data: skills } = await supabase
+          .from('skills')
+          .select('skill')
+          .eq('user_id', userId);
+        
+        // Fetch user education
+        const { data: education } = await supabase
+          .from('education')
+          .select('*')
+          .eq('user_id', userId);
+        
+        // Fetch user links
+        const { data: links } = await supabase
+          .from('links')
+          .select('platform, url')
+          .eq('user_id', userId);
+        
+        // Transform links to expected format
+        const transformedLinks: Record<string, string> = {};
+        if (links) {
+          links.forEach(link => {
+            transformedLinks[link.platform.toLowerCase()] = link.url;
+          });
+        }
+        
+        const userWithDetails: User = {
+          id: profile.id,
+          address: profile.address || "",
+          username: profile.username || "",
+          credits: profile.credits || 0,
+          avatar: profile.avatar_url,
+          bio: profile.bio,
+          skills: skills ? skills.map(s => s.skill) : [],
+          education: education || [],
+          links: transformedLinks,
+          reputation: profile.reputation
+        };
+        
+        setUser(userWithDetails);
+      }
+    } catch (error) {
+      console.error("Error fetching user profile:", error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch user profile.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
   
   const connectWallet = async () => {
     try {
+      if (!session) {
+        toast({
+          title: "Authentication Required",
+          description: "Please sign in with Google first before connecting your wallet.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
       setIsLoading(true);
       const web3Service = new Web3Service();
       await web3Service.connect();
       const address = await web3Service.getAddress();
       
-      // In a real app, you would check if user exists in your database
-      // If not, you would create a new user
-      // For now, we'll just mock it
-      const mockUser = {
-        id: "1",
-        address,
-        username: `user_${address.substring(2, 8)}`,
-        credits: 100,
-        skills: [],
-        education: [],
-        links: {},
-      };
+      // Update the user's profile with their wallet address
+      const { error } = await supabase
+        .from('profiles')
+        .update({ address })
+        .eq('id', session.user.id);
       
-      setUser(mockUser);
+      if (error) throw error;
+      
+      // Update local user state
+      setUser(prev => prev ? { ...prev, address } : null);
+      
       toast({
         title: "Connected!",
         description: "Your wallet has been connected successfully.",
@@ -89,42 +170,78 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
   
-  const disconnectWallet = () => {
-    // In a real implementation, you would disconnect from the provider
-    setUser(null);
-    toast({
-      title: "Disconnected",
-      description: "Your wallet has been disconnected.",
-    });
+  const disconnectWallet = async () => {
+    try {
+      if (!session || !user) return;
+      
+      // Update the user's profile to remove wallet address
+      const { error } = await supabase
+        .from('profiles')
+        .update({ address: null })
+        .eq('id', session.user.id);
+      
+      if (error) throw error;
+      
+      // Update local user state
+      setUser(prev => prev ? { ...prev, address: "" } : null);
+      
+      toast({
+        title: "Disconnected",
+        description: "Your wallet has been disconnected.",
+      });
+    } catch (error) {
+      console.error("Error disconnecting wallet:", error);
+      toast({
+        title: "Error",
+        description: "Failed to disconnect wallet.",
+        variant: "destructive",
+      });
+    }
   };
   
   const loginWithGoogle = async () => {
     try {
       setIsLoading(true);
-      // In a real app, you would use Firebase or another auth provider
-      // For now, we'll just mock a successful login
-      await new Promise(resolve => setTimeout(resolve, 1000)); // simulate API call
       
-      const mockUser = {
-        id: "2",
-        address: "",
-        username: "google_user",
-        credits: 50,
-        skills: [],
-        education: [],
-        links: {},
-      };
-      
-      setUser(mockUser);
-      toast({
-        title: "Logged in!",
-        description: "You've successfully logged in with Google.",
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.origin + '/dashboard',
+        }
       });
+      
+      if (error) throw error;
+      
+      // Auth state change will handle the rest
     } catch (error) {
       console.error("Error logging in with Google:", error);
+      setIsLoading(false);
       toast({
         title: "Login Failed",
         description: "Failed to login with Google. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+  
+  const logout = async () => {
+    try {
+      setIsLoading(true);
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      
+      setUser(null);
+      setSession(null);
+      
+      toast({
+        title: "Logged out",
+        description: "You've been successfully logged out.",
+      });
+    } catch (error) {
+      console.error("Error logging out:", error);
+      toast({
+        title: "Logout Failed",
+        description: "Failed to log out. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -134,11 +251,109 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
   const updateProfile = async (profileData: Partial<User>) => {
     try {
-      setIsLoading(true);
-      // In a real app, you would update the user's profile in your backend
-      await new Promise(resolve => setTimeout(resolve, 1000)); // simulate API call
+      if (!user || !session) return;
       
-      setUser(user => user ? { ...user, ...profileData } : null);
+      setIsLoading(true);
+      
+      // Basic profile data to update
+      const profileUpdate: any = {};
+      if (profileData.username) profileUpdate.username = profileData.username;
+      if (profileData.bio !== undefined) profileUpdate.bio = profileData.bio;
+      if (profileData.avatar !== undefined) profileUpdate.avatar_url = profileData.avatar;
+      
+      // Update profile base data if needed
+      if (Object.keys(profileUpdate).length > 0) {
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .update(profileUpdate)
+          .eq('id', user.id);
+        
+        if (profileError) throw profileError;
+      }
+      
+      // Update skills if provided
+      if (profileData.skills) {
+        // First, delete existing skills
+        const { error: deleteError } = await supabase
+          .from('skills')
+          .delete()
+          .eq('user_id', user.id);
+        
+        if (deleteError) throw deleteError;
+        
+        // Then insert new skills
+        const skillsToInsert = profileData.skills.map(skill => ({
+          user_id: user.id,
+          skill
+        }));
+        
+        if (skillsToInsert.length > 0) {
+          const { error: skillsError } = await supabase
+            .from('skills')
+            .insert(skillsToInsert);
+          
+          if (skillsError) throw skillsError;
+        }
+      }
+      
+      // Update education if provided
+      if (profileData.education) {
+        // First, delete existing education
+        const { error: deleteError } = await supabase
+          .from('education')
+          .delete()
+          .eq('user_id', user.id);
+        
+        if (deleteError) throw deleteError;
+        
+        // Then insert new education
+        const educationToInsert = profileData.education.map(edu => ({
+          user_id: user.id,
+          degree: edu.degree,
+          institution: edu.institution,
+          year: edu.year
+        }));
+        
+        if (educationToInsert.length > 0) {
+          const { error: eduError } = await supabase
+            .from('education')
+            .insert(educationToInsert);
+          
+          if (eduError) throw eduError;
+        }
+      }
+      
+      // Update links if provided
+      if (profileData.links) {
+        // First, delete existing links
+        const { error: deleteError } = await supabase
+          .from('links')
+          .delete()
+          .eq('user_id', user.id);
+        
+        if (deleteError) throw deleteError;
+        
+        // Then insert new links
+        const linksToInsert = Object.entries(profileData.links)
+          .filter(([_, url]) => url) // Only include links with values
+          .map(([platform, url]) => ({
+            user_id: user.id,
+            platform,
+            url
+          }));
+        
+        if (linksToInsert.length > 0) {
+          const { error: linksError } = await supabase
+            .from('links')
+            .insert(linksToInsert);
+          
+          if (linksError) throw linksError;
+        }
+      }
+      
+      // Fetch updated user data to ensure all related data is in sync
+      fetchUserProfile(user.id);
+      
       toast({
         title: "Profile Updated",
         description: "Your profile has been updated successfully.",
@@ -159,12 +374,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     <AuthContext.Provider
       value={{
         user,
-        isAuthenticated: !!user,
+        isAuthenticated: !!session,
         isLoading,
         connectWallet,
         disconnectWallet,
         loginWithGoogle,
         updateProfile,
+        session,
+        logout
       }}
     >
       {children}
