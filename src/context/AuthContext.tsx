@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { Web3Service } from "@/services/web3Service";
@@ -13,6 +12,8 @@ interface AuthContextType {
   connectWallet: () => Promise<void>;
   disconnectWallet: () => void;
   loginWithGoogle: () => Promise<void>;
+  loginWithEmail: (email: string, password: string) => Promise<void>;
+  signUpWithEmail: (email: string, password: string) => Promise<void>;
   updateProfile: (profileData: Partial<User>) => Promise<void>;
   session: Session | null;
   logout: () => Promise<void>;
@@ -223,6 +224,62 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
     }
   };
+
+  const loginWithEmail = async (email: string, password: string) => {
+    try {
+      setIsLoading(true);
+      
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+      
+      if (error) throw error;
+      
+      // Auth state change will handle the rest
+    } catch (error) {
+      console.error("Error logging in with email:", error);
+      setIsLoading(false);
+      toast({
+        title: "Login Failed",
+        description: error instanceof Error ? error.message : "Failed to login with email. Please try again.",
+        variant: "destructive",
+      });
+      throw error;
+    }
+  };
+  
+  const signUpWithEmail = async (email: string, password: string) => {
+    try {
+      setIsLoading(true);
+      
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: window.location.origin + '/dashboard',
+        }
+      });
+      
+      if (error) throw error;
+      
+      toast({
+        title: "Registration Successful",
+        description: "Please check your email to verify your account.",
+      });
+      
+      setIsLoading(false);
+    } catch (error) {
+      console.error("Error signing up with email:", error);
+      setIsLoading(false);
+      toast({
+        title: "Registration Failed",
+        description: error instanceof Error ? error.message : "Failed to sign up with email. Please try again.",
+        variant: "destructive",
+      });
+      throw error;
+    }
+  };
   
   const logout = async () => {
     try {
@@ -379,6 +436,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         connectWallet,
         disconnectWallet,
         loginWithGoogle,
+        loginWithEmail,
+        signUpWithEmail,
         updateProfile,
         session,
         logout
