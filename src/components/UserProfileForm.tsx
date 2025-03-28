@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -7,9 +6,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { X, Plus } from "lucide-react";
 import { Education } from "@/types/user";
+import { useToast } from "@/hooks/use-toast";
 
 export function UserProfileForm() {
   const { user, updateProfile } = useAuth();
+  const { toast } = useToast();
   
   const [formData, setFormData] = useState({
     username: user?.username || "",
@@ -21,9 +22,9 @@ export function UserProfileForm() {
     newInstitution: "",
     newYear: "",
     links: {
-      github: user?.links.github || "",
-      linkedin: user?.links.linkedin || "",
-      portfolio: user?.links.portfolio || "",
+      github: user?.links?.github || "",
+      linkedin: user?.links?.linkedin || "",
+      portfolio: user?.links?.portfolio || "",
     },
   });
   
@@ -34,7 +35,7 @@ export function UserProfileForm() {
       setFormData(prev => ({
         ...prev,
         [parent]: {
-          ...prev[parent as keyof typeof prev],
+          ...(prev[parent as keyof typeof prev] as Record<string, unknown>),
           [child]: value,
         },
       }));
@@ -88,15 +89,28 @@ export function UserProfileForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const profileData = {
-      username: formData.username,
-      bio: formData.bio,
-      skills: formData.skills,
-      education: formData.education,
-      links: formData.links,
-    };
-    
-    await updateProfile(profileData);
+    try {
+      const profileData = {
+        username: formData.username,
+        bio: formData.bio,
+        skills: formData.skills,
+        education: formData.education,
+        links: formData.links,
+      };
+      
+      await updateProfile(profileData);
+      toast({
+        title: "Profile updated",
+        description: "Your profile has been successfully updated.",
+      });
+    } catch (error) {
+      console.error("Failed to update profile:", error);
+      toast({
+        title: "Update failed",
+        description: "There was an error updating your profile. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
   
   return (
