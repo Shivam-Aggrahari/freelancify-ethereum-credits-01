@@ -45,7 +45,7 @@ export function GigList() {
           credits: item.credits,
           createdBy: item.creator?.username || 'Unknown',
           createdAt: new Date(item.created_at),
-          status: item.status,
+          status: item.status === 'open' ? 'open' : item.status === 'assigned' ? 'assigned' : 'completed',
           assignedTo: item.assigned_to
         }));
 
@@ -110,7 +110,7 @@ export function GigList() {
                 <SelectValue placeholder="All Categories" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Categories</SelectItem>
+                <SelectItem value="all-categories">All Categories</SelectItem>
                 {categories.map((category) => (
                   <SelectItem key={category} value={category}>{category}</SelectItem>
                 ))}

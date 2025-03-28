@@ -4,7 +4,6 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Navbar } from "@/components/Navbar";
 import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -12,9 +11,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 const Login = () => {
   const { loginWithGoogle, connectWallet, isLoading, isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState("google");
   const [error, setError] = useState<string | null>(null);
-  const [showConnectWallet, setShowConnectWallet] = useState(false);
   
   useEffect(() => {
     // If user is already authenticated, redirect to dashboard
