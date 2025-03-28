@@ -18,7 +18,7 @@ export function GigList() {
   const [gigs, setGigs] = useState<Gig[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState<string>("");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [filteredGigs, setFilteredGigs] = useState<Gig[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [myGigs, setMyGigs] = useState<Record<string, boolean>>({});
@@ -101,7 +101,7 @@ export function GigList() {
       );
     }
 
-    if (categoryFilter) {
+    if (categoryFilter && categoryFilter !== "all") {
       result = result.filter(gig => gig.category === categoryFilter);
     }
 
@@ -111,7 +111,7 @@ export function GigList() {
   // Reset filters
   const resetFilters = () => {
     setSearchTerm("");
-    setCategoryFilter("");
+    setCategoryFilter("all");
   };
 
   // Handle application submission
@@ -176,7 +176,7 @@ export function GigList() {
                 <SelectValue placeholder="All Categories" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Categories</SelectItem>
+                <SelectItem value="all">All Categories</SelectItem>
                 {categories.map((category) => (
                   <SelectItem key={category} value={category}>{category}</SelectItem>
                 ))}
