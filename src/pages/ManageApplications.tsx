@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
@@ -18,8 +19,8 @@ interface Application {
   cover_letter: string;
   status: 'pending' | 'accepted' | 'rejected';
   created_at: string;
-  applicant: {
-    username: string;
+  applicant?: {
+    username: string | null;
     avatar_url: string | null;
     skills: { skill: string }[];
     reputation: number | null;
@@ -79,16 +80,15 @@ const ManageApplications = () => {
           status: gigData.status
         });
         
-        // Fetch applications for this gig
-        // @ts-ignore - Ignoring type error until Supabase types are updated
+        // Fetch applications for this gig and join with profile data
         const { data: applicationsData, error: appError } = await supabase
           .from('applications')
           .select(`
             *,
-            applicant:profiles!user_id(
-              username, 
-              avatar_url, 
-              reputation,
+            applicant:user_id(
+              username:username, 
+              avatar_url:avatar_url, 
+              reputation:reputation,
               skills:skills(skill)
             )
           `)
@@ -97,7 +97,23 @@ const ManageApplications = () => {
         
         if (appError) throw appError;
         
-        setApplications(applicationsData as Application[]);
+        // Process the data to ensure it matches our Application interface
+        const processedApplications: Application[] = applicationsData.map((app: any) => ({
+          id: app.id,
+          user_id: app.user_id,
+          gig_id: app.gig_id,
+          cover_letter: app.cover_letter,
+          status: app.status,
+          created_at: app.created_at,
+          applicant: app.applicant && !app.applicant.error ? {
+            username: app.applicant.username,
+            avatar_url: app.applicant.avatar_url,
+            skills: app.applicant.skills || [],
+            reputation: app.applicant.reputation
+          } : undefined
+        }));
+        
+        setApplications(processedApplications);
       } catch (error) {
         console.error("Error fetching applications:", error);
         toast({
@@ -118,7 +134,6 @@ const ManageApplications = () => {
     
     try {
       // Update the application status
-      // @ts-ignore - Ignoring type error until Supabase types are updated
       const { error: appError } = await supabase
         .from('applications')
         .update({ status: 'accepted' })
@@ -138,7 +153,6 @@ const ManageApplications = () => {
       if (gigError) throw gigError;
       
       // Reject all other applications for this gig
-      // @ts-ignore - Ignoring type error until Supabase types are updated
       const { error: rejectError } = await supabase
         .from('applications')
         .update({ status: 'rejected' })
@@ -178,7 +192,6 @@ const ManageApplications = () => {
     setProcessingAction(applicationId);
     
     try {
-      // @ts-ignore - Ignoring type error until Supabase types are updated
       const { error } = await supabase
         .from('applications')
         .update({ status: 'rejected' })
@@ -272,7 +285,7 @@ const ManageApplications = () => {
                         {application.applicant?.reputation !== null && (
                           <div className="flex items-center">
                             <span className="text-sm text-muted-foreground mr-1">Reputation:</span>
-                            <span className="text-sm font-medium">{application.applicant.reputation}</span>
+                            <span className="text-sm font-medium">{application.applicant?.reputation}</span>
                           </div>
                         )}
                       </div>
