@@ -17,6 +17,8 @@ interface AuthContextType {
   updateProfile: (profileData: Partial<User>) => Promise<void>;
   session: Session | null;
   logout: () => Promise<void>;
+  createEscrow: (gigId: string, amount: number) => Promise<void>;
+  releaseEscrow: (escrowId: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -28,14 +30,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const { toast } = useToast();
   
   useEffect(() => {
-    // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, newSession) => {
         console.log("Auth state changed:", event, newSession);
         setSession(newSession);
         
         if (newSession?.user) {
-          // Defer fetching profile to avoid Supabase subscription deadlock
           setTimeout(() => {
             fetchUserProfile(newSession.user.id);
           }, 0);
@@ -45,7 +45,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     );
     
-    // THEN check for existing session
     supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
       setSession(currentSession);
       
@@ -63,7 +62,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       setIsLoading(true);
       
-      // Fetch user profile from Supabase
       const { data: profile, error } = await supabase
         .from('profiles')
         .select('*')
@@ -75,25 +73,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
       
       if (profile) {
-        // Fetch user skills
         const { data: skills } = await supabase
           .from('skills')
           .select('skill')
           .eq('user_id', userId);
         
-        // Fetch user education
         const { data: education } = await supabase
           .from('education')
           .select('*')
           .eq('user_id', userId);
         
-        // Fetch user links
         const { data: links } = await supabase
           .from('links')
           .select('platform, url')
           .eq('user_id', userId);
         
-        // Transform links to expected format
         const transformedLinks: Record<string, string> = {};
         if (links) {
           links.forEach(link => {
@@ -111,7 +105,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           skills: skills ? skills.map(s => s.skill) : [],
           education: education || [],
           links: transformedLinks,
-          reputation: profile.reputation
+          reputation: profile.reputation,
+          resume: profile.resume_url,
         };
         
         setUser(userWithDetails);
@@ -144,7 +139,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await web3Service.connect();
       const address = await web3Service.getAddress();
       
-      // Update the user's profile with their wallet address
       const { error } = await supabase
         .from('profiles')
         .update({ address })
@@ -152,7 +146,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       if (error) throw error;
       
-      // Update local user state
       setUser(prev => prev ? { ...prev, address } : null);
       
       toast({
@@ -175,7 +168,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       if (!session || !user) return;
       
-      // Update the user's profile to remove wallet address
       const { error } = await supabase
         .from('profiles')
         .update({ address: null })
@@ -183,7 +175,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       if (error) throw error;
       
-      // Update local user state
       setUser(prev => prev ? { ...prev, address: "" } : null);
       
       toast({
@@ -312,13 +303,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       setIsLoading(true);
       
-      // Basic profile data to update
       const profileUpdate: any = {};
       if (profileData.username) profileUpdate.username = profileData.username;
       if (profileData.bio !== undefined) profileUpdate.bio = profileData.bio;
       if (profileData.avatar !== undefined) profileUpdate.avatar_url = profileData.avatar;
+      if (profileData.resume !== undefined) profileUpdate.resume_url = profileData.resume;
       
-      // Update profile base data if needed
       if (Object.keys(profileUpdate).length > 0) {
         const { error: profileError } = await supabase
           .from('profiles')
@@ -328,9 +318,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (profileError) throw profileError;
       }
       
-      // Update skills if provided
       if (profileData.skills) {
-        // First, delete existing skills
         const { error: deleteError } = await supabase
           .from('skills')
           .delete()
@@ -338,7 +326,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         
         if (deleteError) throw deleteError;
         
-        // Then insert new skills
         const skillsToInsert = profileData.skills.map(skill => ({
           user_id: user.id,
           skill
@@ -353,9 +340,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
       }
       
-      // Update education if provided
       if (profileData.education) {
-        // First, delete existing education
         const { error: deleteError } = await supabase
           .from('education')
           .delete()
@@ -363,7 +348,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         
         if (deleteError) throw deleteError;
         
-        // Then insert new education
         const educationToInsert = profileData.education.map(edu => ({
           user_id: user.id,
           degree: edu.degree,
@@ -380,9 +364,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
       }
       
-      // Update links if provided
       if (profileData.links) {
-        // First, delete existing links
         const { error: deleteError } = await supabase
           .from('links')
           .delete()
@@ -390,9 +372,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         
         if (deleteError) throw deleteError;
         
-        // Then insert new links
         const linksToInsert = Object.entries(profileData.links)
-          .filter(([_, url]) => url) // Only include links with values
+          .filter(([_, url]) => url)
           .map(([platform, url]) => ({
             user_id: user.id,
             platform,
@@ -408,7 +389,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
       }
       
-      // Fetch updated user data to ensure all related data is in sync
       fetchUserProfile(user.id);
       
       toast({
@@ -420,6 +400,90 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       toast({
         title: "Update Failed",
         description: "Failed to update profile. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  const createEscrow = async (gigId: string, amount: number) => {
+    try {
+      if (!user || !session) {
+        toast({
+          title: "Authentication Required",
+          description: "Please sign in before creating an escrow.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      setIsLoading(true);
+      
+      const { data, error } = await supabase
+        .from('escrow')
+        .insert({
+          gig_id: gigId,
+          client_id: user.id,
+          amount: amount,
+          status: 'pending'
+        })
+        .select()
+        .single();
+      
+      if (error) throw error;
+      
+      toast({
+        title: "Escrow Created",
+        description: "Your funds have been placed in escrow for this gig.",
+      });
+      
+      return data;
+    } catch (error) {
+      console.error("Error creating escrow:", error);
+      toast({
+        title: "Escrow Failed",
+        description: "Failed to create escrow. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  const releaseEscrow = async (escrowId: string) => {
+    try {
+      if (!user || !session) {
+        toast({
+          title: "Authentication Required",
+          description: "Please sign in to release escrow funds.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      setIsLoading(true);
+      
+      const { error } = await supabase
+        .from('escrow')
+        .update({
+          status: 'released',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', escrowId)
+        .eq('client_id', user.id);
+      
+      if (error) throw error;
+      
+      toast({
+        title: "Funds Released",
+        description: "Escrow funds have been released to the freelancer.",
+      });
+    } catch (error) {
+      console.error("Error releasing escrow:", error);
+      toast({
+        title: "Release Failed",
+        description: "Failed to release escrow funds. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -440,7 +504,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         signUpWithEmail,
         updateProfile,
         session,
-        logout
+        logout,
+        createEscrow,
+        releaseEscrow
       }}
     >
       {children}

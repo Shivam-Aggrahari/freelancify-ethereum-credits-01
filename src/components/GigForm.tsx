@@ -1,13 +1,20 @@
 
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/context/AuthContext";
+import { Loader2 } from "lucide-react";
 
 export function GigForm() {
   const { toast } = useToast();
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   const [formData, setFormData] = useState({
     title: "",
@@ -84,28 +91,43 @@ export function GigForm() {
     }
     
     try {
-      // In a real app, you would send this data to your backend
-      // For now, we'll just mock a successful API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      setIsSubmitting(true);
+      
+      if (!user) {
+        throw new Error("User not authenticated");
+      }
+      
+      const { data, error } = await supabase
+        .from('gigs')
+        .insert({
+          title: formData.title,
+          description: formData.description,
+          category: formData.category,
+          credits: formData.credits,
+          created_by: user.id,
+          status: 'open'
+        })
+        .select()
+        .single();
+      
+      if (error) throw error;
       
       toast({
         title: "Success!",
         description: "Your gig has been posted successfully",
       });
       
-      // Reset form
-      setFormData({
-        title: "",
-        description: "",
-        category: "",
-        credits: 100,
-      });
+      // Navigate to the gig detail page
+      navigate(`/gig/${data.id}`);
     } catch (error) {
+      console.error("Error posting gig:", error);
       toast({
         title: "Error",
         description: "Failed to post your gig. Please try again",
         variant: "destructive",
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
   
@@ -168,7 +190,16 @@ export function GigForm() {
         </div>
       </div>
       
-      <Button type="submit" className="w-full">Post Gig</Button>
+      <Button type="submit" className="w-full" disabled={isSubmitting}>
+        {isSubmitting ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Posting...
+          </>
+        ) : (
+          "Post Gig"
+        )}
+      </Button>
     </form>
   );
 }

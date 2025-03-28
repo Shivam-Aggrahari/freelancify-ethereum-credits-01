@@ -5,18 +5,22 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Filter } from "lucide-react";
+import { Search, Filter, Briefcase } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Gig } from "@/types/user";
 import { Link } from "react-router-dom";
+import { GigApplication } from "@/components/GigApplication";
+import { useAuth } from "@/context/AuthContext";
 
 export function GigList() {
+  const { user } = useAuth();
   const [gigs, setGigs] = useState<Gig[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("");
   const [filteredGigs, setFilteredGigs] = useState<Gig[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
+  const [myGigs, setMyGigs] = useState<Record<string, boolean>>({});
 
   // Fetch gigs from Supabase
   useEffect(() => {
@@ -55,6 +59,19 @@ export function GigList() {
         // Extract unique categories
         const uniqueCategories = Array.from(new Set(formattedGigs.map(gig => gig.category)));
         setCategories(uniqueCategories);
+        
+        // Check if any gigs were created by the current user
+        if (user) {
+          const myGigsMap: Record<string, boolean> = {};
+          
+          for (const gig of data) {
+            if (gig.created_by === user.id) {
+              myGigsMap[gig.id] = true;
+            }
+          }
+          
+          setMyGigs(myGigsMap);
+        }
       } catch (error) {
         console.error("Error fetching gigs:", error);
       } finally {
@@ -63,7 +80,7 @@ export function GigList() {
     };
 
     fetchGigs();
-  }, []);
+  }, [user]);
 
   // Filter gigs based on search term and category
   useEffect(() => {
@@ -93,7 +110,7 @@ export function GigList() {
 
   return (
     <div className="space-y-6">
-      <div className="bg-white p-4 rounded-lg shadow-sm mb-6">
+      <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm mb-6">
         <div className="flex flex-col md:flex-row gap-4">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 h-4 w-4" />
@@ -110,7 +127,7 @@ export function GigList() {
                 <SelectValue placeholder="All Categories" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all-categories">All Categories</SelectItem>
+                <SelectItem value="">All Categories</SelectItem>
                 {categories.map((category) => (
                   <SelectItem key={category} value={category}>{category}</SelectItem>
                 ))}
@@ -147,7 +164,10 @@ export function GigList() {
           {filteredGigs.map((gig) => (
             <Card key={gig.id} className="overflow-hidden">
               <CardHeader className="pb-2">
-                <CardTitle>{gig.title}</CardTitle>
+                <CardTitle className="flex items-center">
+                  {gig.title}
+                  {user && <GigApplication gigId={gig.id} />}
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground line-clamp-3 mb-2">
@@ -162,9 +182,18 @@ export function GigList() {
               </CardContent>
               <CardFooter className="flex justify-between border-t p-4">
                 <p className="font-semibold">{gig.credits} Credits</p>
-                <Link to={`/gig/${gig.id}`}>
-                  <Button>Apply</Button>
-                </Link>
+                {myGigs[gig.id] ? (
+                  <Link to={`/gig/${gig.id}/applications`}>
+                    <Button variant="secondary" className="flex items-center gap-1">
+                      <Briefcase className="h-4 w-4 mr-1" />
+                      Manage
+                    </Button>
+                  </Link>
+                ) : (
+                  <Link to={`/gig/${gig.id}`}>
+                    <Button>Apply</Button>
+                  </Link>
+                )}
               </CardFooter>
             </Card>
           ))}

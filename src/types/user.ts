@@ -13,6 +13,7 @@ export interface User {
     linkedin?: string;
     portfolio?: string;
   };
+  resume?: string;
   reputation?: number;
 }
 

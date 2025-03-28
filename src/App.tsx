@@ -16,6 +16,8 @@ import Gigs from "./pages/Gigs";
 import PostGig from "./pages/PostGig";
 import Mining from "./pages/Mining";
 import NotFound from "./pages/NotFound";
+import GigDetail from "./pages/GigDetail";
+import ManageApplications from "./pages/ManageApplications";
 
 const queryClient = new QueryClient();
 
@@ -34,6 +36,8 @@ const App = () => (
             <Route path="/profile/edit" element={<EditProfile />} />
             <Route path="/gigs" element={<Gigs />} />
             <Route path="/post-gig" element={<PostGig />} />
+            <Route path="/gig/:id" element={<GigDetail />} />
+            <Route path="/gig/:id/applications" element={<ManageApplications />} />
             <Route path="/mining" element={<Mining />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
