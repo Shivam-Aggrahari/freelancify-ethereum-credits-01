@@ -12,30 +12,30 @@ export type Database = {
       applications: {
         Row: {
           cover_letter: string
-          created_at: string | null
-          gig_id: string | null
+          created_at: string
+          gig_id: string
           id: string
           status: string
-          updated_at: string | null
-          user_id: string | null
+          updated_at: string
+          user_id: string
         }
         Insert: {
           cover_letter: string
-          created_at?: string | null
-          gig_id?: string | null
+          created_at?: string
+          gig_id: string
           id?: string
           status?: string
-          updated_at?: string | null
-          user_id?: string | null
+          updated_at?: string
+          user_id: string
         }
         Update: {
           cover_letter?: string
-          created_at?: string | null
-          gig_id?: string | null
+          created_at?: string
+          gig_id?: string
           id?: string
           status?: string
-          updated_at?: string | null
-          user_id?: string | null
+          updated_at?: string
+          user_id?: string
         }
         Relationships: [
           {
@@ -43,13 +43,6 @@ export type Database = {
             columns: ["gig_id"]
             isOneToOne: false
             referencedRelation: "gigs"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "applications_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -94,33 +87,46 @@ export type Database = {
           amount: number
           client_id: string | null
           created_at: string | null
+          freelancer_id: string | null
           gig_id: string | null
           id: string
-          status: string
+          status: string | null
+          tx_hash: string | null
           updated_at: string | null
         }
         Insert: {
           amount: number
           client_id?: string | null
           created_at?: string | null
+          freelancer_id?: string | null
           gig_id?: string | null
           id?: string
-          status?: string
+          status?: string | null
+          tx_hash?: string | null
           updated_at?: string | null
         }
         Update: {
           amount?: number
           client_id?: string | null
           created_at?: string | null
+          freelancer_id?: string | null
           gig_id?: string | null
           id?: string
-          status?: string
+          status?: string | null
+          tx_hash?: string | null
           updated_at?: string | null
         }
         Relationships: [
           {
             foreignKeyName: "escrow_client_id_fkey"
             columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "escrow_freelancer_id_fkey"
+            columns: ["freelancer_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -143,7 +149,7 @@ export type Database = {
           credits: number
           description: string
           id: string
-          status: string
+          status: string | null
           title: string
           updated_at: string | null
         }
@@ -155,7 +161,7 @@ export type Database = {
           credits: number
           description: string
           id?: string
-          status?: string
+          status?: string | null
           title: string
           updated_at?: string | null
         }
@@ -167,7 +173,7 @@ export type Database = {
           credits?: number
           description?: string
           id?: string
-          status?: string
+          status?: string | null
           title?: string
           updated_at?: string | null
         }
