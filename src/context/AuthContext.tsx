@@ -62,6 +62,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       setIsLoading(true);
       
+      // First check if profile exists
       const { data: profile, error } = await supabase
         .from('profiles')
         .select('*')
@@ -69,47 +70,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         .single();
       
       if (error) {
-        throw error;
-      }
-      
-      if (profile) {
-        const { data: skills } = await supabase
-          .from('skills')
-          .select('skill')
-          .eq('user_id', userId);
-        
-        const { data: education } = await supabase
-          .from('education')
-          .select('*')
-          .eq('user_id', userId);
-        
-        const { data: links } = await supabase
-          .from('links')
-          .select('platform, url')
-          .eq('user_id', userId);
-        
-        const transformedLinks: Record<string, string> = {};
-        if (links) {
-          links.forEach(link => {
-            transformedLinks[link.platform.toLowerCase()] = link.url;
-          });
+        // If the profile doesn't exist, create it
+        if (error.code === 'PGRST116') {
+          await createProfile(userId);
+          // Fetch again after creating
+          const { data: newProfile, error: newError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', userId)
+            .single();
+          
+          if (newError) throw newError;
+          
+          if (newProfile) {
+            await loadUserProfile(newProfile);
+          }
+        } else {
+          throw error;
         }
-        
-        const userWithDetails: User = {
-          id: profile.id,
-          address: profile.address || "",
-          username: profile.username || "",
-          credits: profile.credits || 0,
-          avatar: profile.avatar_url,
-          bio: profile.bio,
-          skills: skills ? skills.map(s => s.skill) : [],
-          education: education || [],
-          links: transformedLinks,
-          reputation: profile.reputation,
-          resume: profile.resume_url,
-        };
-        
-        setUser(userWithDetails);
+      } else if (profile) {
+        await loadUserProfile(profile);
       }
     } catch (error) {
       console.error("Error fetching user profile:", error);
@@ -120,6 +100,72 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+  
+  const createProfile = async (userId: string) => {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .insert({
+          id: userId,
+          username: '',
+          avatar_url: '',
+          bio: '',
+          credits: 0
+        });
+      
+      if (error) throw error;
+      
+      console.log("Created new profile for user:", userId);
+    } catch (error) {
+      console.error("Error creating user profile:", error);
+      throw error;
+    }
+  };
+  
+  const loadUserProfile = async (profile: any) => {
+    try {
+      const { data: skills } = await supabase
+        .from('skills')
+        .select('skill')
+        .eq('user_id', profile.id);
+      
+      const { data: education } = await supabase
+        .from('education')
+        .select('*')
+        .eq('user_id', profile.id);
+      
+      const { data: links } = await supabase
+        .from('links')
+        .select('platform, url')
+        .eq('user_id', profile.id);
+      
+      const transformedLinks: Record<string, string> = {};
+      if (links) {
+        links.forEach(link => {
+          transformedLinks[link.platform.toLowerCase()] = link.url;
+        });
+      }
+      
+      const userWithDetails: User = {
+        id: profile.id,
+        address: profile.address || "",
+        username: profile.username || "",
+        credits: profile.credits || 0,
+        avatar: profile.avatar_url,
+        bio: profile.bio,
+        skills: skills ? skills.map(s => s.skill) : [],
+        education: education || [],
+        links: transformedLinks,
+        reputation: profile.reputation,
+        resume: profile.resume_url,
+      };
+      
+      setUser(userWithDetails);
+    } catch (error) {
+      console.error("Error loading user profile details:", error);
+      throw error;
     }
   };
   
