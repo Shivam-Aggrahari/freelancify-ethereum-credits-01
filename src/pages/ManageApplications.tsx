@@ -10,7 +10,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
-import { Loader2, CheckCircle, XCircle } from "lucide-react";
+import { Loader2, CheckCircle, XCircle, ArrowLeft } from "lucide-react";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 
 interface Application {
   id: string;
@@ -24,6 +25,7 @@ interface Application {
     avatar_url: string | null;
     skills: { skill: string }[];
     reputation: number | null;
+    bio: string | null;
   };
 }
 
@@ -89,6 +91,7 @@ const ManageApplications = () => {
               username:username, 
               avatar_url:avatar_url, 
               reputation:reputation,
+              bio:bio,
               skills:skills(skill)
             )
           `)
@@ -108,6 +111,7 @@ const ManageApplications = () => {
           applicant: app.applicant && !app.applicant.error ? {
             username: app.applicant.username,
             avatar_url: app.applicant.avatar_url,
+            bio: app.applicant.bio,
             skills: app.applicant.skills || [],
             reputation: app.applicant.reputation
           } : undefined
@@ -244,8 +248,9 @@ const ManageApplications = () => {
             <Button 
               variant="outline" 
               onClick={() => navigate("/gigs")}
-              className="mb-2"
+              className="mb-2 flex items-center gap-2"
             >
+              <ArrowLeft className="h-4 w-4" />
               Back to Gigs
             </Button>
             <h1 className="text-2xl font-bold">Applications for: {gig?.title}</h1>
@@ -273,12 +278,35 @@ const ManageApplications = () => {
                 <CardHeader className="pb-0">
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
                     <div className="flex items-center gap-3 mb-2 sm:mb-0">
-                      <Avatar className="h-10 w-10">
-                        <AvatarImage src={application.applicant?.avatar_url || undefined} />
-                        <AvatarFallback>
-                          {application.applicant?.username?.substring(0, 2).toUpperCase() || "??"}
-                        </AvatarFallback>
-                      </Avatar>
+                      <HoverCard>
+                        <HoverCardTrigger asChild>
+                          <Avatar className="h-10 w-10 cursor-pointer">
+                            <AvatarImage src={application.applicant?.avatar_url || undefined} />
+                            <AvatarFallback>
+                              {application.applicant?.username?.substring(0, 2).toUpperCase() || "??"}
+                            </AvatarFallback>
+                          </Avatar>
+                        </HoverCardTrigger>
+                        <HoverCardContent className="w-80">
+                          <div className="flex flex-col gap-2">
+                            <div className="flex items-center gap-3">
+                              <Avatar className="h-12 w-12">
+                                <AvatarImage src={application.applicant?.avatar_url || undefined} />
+                                <AvatarFallback>
+                                  {application.applicant?.username?.substring(0, 2).toUpperCase() || "??"}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <h4 className="text-sm font-semibold">{application.applicant?.username || "Anonymous"}</h4>
+                                <p className="text-xs text-muted-foreground">Reputation: {application.applicant?.reputation || 0}</p>
+                              </div>
+                            </div>
+                            {application.applicant?.bio && (
+                              <p className="text-sm">{application.applicant.bio}</p>
+                            )}
+                          </div>
+                        </HoverCardContent>
+                      </HoverCard>
                       
                       <div>
                         <p className="font-medium">{application.applicant?.username || "Anonymous"}</p>

@@ -7,7 +7,7 @@ import { formatDistanceToNow } from "date-fns";
 import { useAuth } from "@/context/AuthContext";
 import { GigApplication } from "@/components/GigApplication";
 import { Link } from "react-router-dom";
-import { Briefcase, User } from "lucide-react";
+import { Briefcase, User, Send } from "lucide-react";
 
 interface GigCardProps {
   gig: Gig;
