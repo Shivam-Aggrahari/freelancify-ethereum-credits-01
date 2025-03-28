@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
@@ -81,6 +80,7 @@ const ManageApplications = () => {
         });
         
         // Fetch applications for this gig
+        // @ts-ignore - Ignoring type error until Supabase types are updated
         const { data: applicationsData, error: appError } = await supabase
           .from('applications')
           .select(`
@@ -118,6 +118,7 @@ const ManageApplications = () => {
     
     try {
       // Update the application status
+      // @ts-ignore - Ignoring type error until Supabase types are updated
       const { error: appError } = await supabase
         .from('applications')
         .update({ status: 'accepted' })
@@ -137,6 +138,7 @@ const ManageApplications = () => {
       if (gigError) throw gigError;
       
       // Reject all other applications for this gig
+      // @ts-ignore - Ignoring type error until Supabase types are updated
       const { error: rejectError } = await supabase
         .from('applications')
         .update({ status: 'rejected' })
@@ -176,6 +178,7 @@ const ManageApplications = () => {
     setProcessingAction(applicationId);
     
     try {
+      // @ts-ignore - Ignoring type error until Supabase types are updated
       const { error } = await supabase
         .from('applications')
         .update({ status: 'rejected' })

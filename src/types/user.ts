@@ -34,3 +34,13 @@ export interface Gig {
   status: 'open' | 'assigned' | 'completed';
   assignedTo?: string;
 }
+
+export interface Application {
+  id: string;
+  user_id: string;
+  gig_id: string;
+  cover_letter: string;
+  status: 'pending' | 'accepted' | 'rejected';
+  created_at: string;
+  updated_at: string;
+}

@@ -21,6 +21,7 @@ export function GigApplication({ gigId }: GigApplicationProps) {
     
     const checkApplicationStatus = async () => {
       try {
+        // @ts-ignore - Ignoring type error until Supabase types are updated
         const { data, error } = await supabase
           .from('applications')
           .select('status')

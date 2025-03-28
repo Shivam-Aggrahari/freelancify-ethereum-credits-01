@@ -9,6 +9,44 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      applications: {
+        Row: {
+          cover_letter: string
+          created_at: string
+          gig_id: string
+          id: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cover_letter: string
+          created_at?: string
+          gig_id: string
+          id?: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          cover_letter?: string
+          created_at?: string
+          gig_id?: string
+          id?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "applications_gig_id_fkey"
+            columns: ["gig_id"]
+            isOneToOne: false
+            referencedRelation: "gigs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       education: {
         Row: {
           created_at: string | null
@@ -197,6 +235,7 @@ export type Database = {
           credits: number | null
           id: string
           reputation: number | null
+          resume_url: string | null
           updated_at: string | null
           username: string | null
         }
@@ -208,6 +247,7 @@ export type Database = {
           credits?: number | null
           id: string
           reputation?: number | null
+          resume_url?: string | null
           updated_at?: string | null
           username?: string | null
         }
@@ -219,6 +259,7 @@ export type Database = {
           credits?: number | null
           id?: string
           reputation?: number | null
+          resume_url?: string | null
           updated_at?: string | null
           username?: string | null
         }
