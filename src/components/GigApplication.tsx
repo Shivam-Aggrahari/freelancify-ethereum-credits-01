@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
@@ -130,7 +129,7 @@ export function GigApplication({ gigId, onApply, showApplyButton = false }: GigA
         onClick={handleQuickApply} 
         disabled={isApplying}
         size="sm"
-        variant="primary"
+        variant="default"
         className="flex items-center gap-1"
       >
         {isApplying ? (
