@@ -4,13 +4,20 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from "date-fns";
+import { useAuth } from "@/context/AuthContext";
+import { GigApplication } from "@/components/GigApplication";
+import { Link } from "react-router-dom";
+import { Briefcase } from "lucide-react";
 
 interface GigCardProps {
   gig: Gig;
   onApply?: () => void;
+  myGig?: boolean;
 }
 
-export function GigCard({ gig, onApply }: GigCardProps) {
+export function GigCard({ gig, onApply, myGig = false }: GigCardProps) {
+  const { user } = useAuth();
+  
   const formatDate = (date: Date) => {
     return formatDistanceToNow(date, { addSuffix: true });
   };
@@ -58,9 +65,24 @@ export function GigCard({ gig, onApply }: GigCardProps) {
         <div>
           <span className="font-medium text-web3-blue">{gig.credits} Credits</span>
         </div>
-        {gig.status === "open" && onApply && (
-          <Button onClick={onApply} variant="outline">Apply</Button>
-        )}
+        <div className="flex items-center gap-2">
+          {user && !myGig && gig.status === "open" && (
+            <GigApplication gigId={gig.id} showApplyButton={true} onApply={onApply} />
+          )}
+          
+          {myGig ? (
+            <Link to={`/gig/${gig.id}/applications`}>
+              <Button variant="secondary" className="flex items-center gap-1">
+                <Briefcase className="h-4 w-4 mr-1" />
+                Manage
+              </Button>
+            </Link>
+          ) : (
+            <Link to={`/gig/${gig.id}`}>
+              <Button variant="outline">View Details</Button>
+            </Link>
+          )}
+        </div>
       </CardFooter>
     </Card>
   );

@@ -1,19 +1,20 @@
 
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Filter, Briefcase } from "lucide-react";
+import { Search, Filter } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Gig } from "@/types/user";
-import { Link } from "react-router-dom";
-import { GigApplication } from "@/components/GigApplication";
 import { useAuth } from "@/context/AuthContext";
+import { GigCard } from "@/components/GigCard";
+import { useToast } from "@/components/ui/use-toast";
 
 export function GigList() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [gigs, setGigs] = useState<Gig[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -74,13 +75,18 @@ export function GigList() {
         }
       } catch (error) {
         console.error("Error fetching gigs:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load gigs. Please refresh the page.",
+          variant: "destructive",
+        });
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchGigs();
-  }, [user]);
+  }, [user, toast]);
 
   // Filter gigs based on search term and category
   useEffect(() => {
@@ -106,6 +112,49 @@ export function GigList() {
   const resetFilters = () => {
     setSearchTerm("");
     setCategoryFilter("");
+  };
+
+  // Handle application submission
+  const handleApply = () => {
+    // Refresh the gigs list after a successful application
+    setTimeout(() => {
+      const fetchGigs = async () => {
+        try {
+          const { data, error } = await supabase
+            .from('gigs')
+            .select(`
+              *,
+              creator:profiles!created_by(username, avatar_url)
+            `)
+            .eq('status', 'open')
+            .order('created_at', { ascending: false });
+
+          if (error) {
+            throw error;
+          }
+
+          // Transform data to match Gig type
+          const formattedGigs: Gig[] = data.map(item => ({
+            id: item.id,
+            title: item.title,
+            description: item.description,
+            category: item.category,
+            credits: item.credits,
+            createdBy: item.creator?.username || 'Unknown',
+            createdAt: new Date(item.created_at),
+            status: item.status === 'open' ? 'open' : item.status === 'assigned' ? 'assigned' : 'completed',
+            assignedTo: item.assigned_to
+          }));
+
+          setGigs(formattedGigs);
+          setFilteredGigs(formattedGigs);
+        } catch (error) {
+          console.error("Error refreshing gigs:", error);
+        }
+      };
+
+      fetchGigs();
+    }, 500);
   };
 
   return (
@@ -144,58 +193,30 @@ export function GigList() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {[...Array(6)].map((_, i) => (
             <Card key={i} className="overflow-hidden">
-              <CardHeader className="pb-2">
-                <Skeleton className="h-6 w-3/4" />
-              </CardHeader>
-              <CardContent>
-                <Skeleton className="h-4 w-full mb-2" />
-                <Skeleton className="h-4 w-5/6 mb-2" />
-                <Skeleton className="h-4 w-4/6" />
+              <CardContent className="p-0">
+                <div className="p-6">
+                  <Skeleton className="h-6 w-3/4 mb-4" />
+                  <Skeleton className="h-4 w-full mb-2" />
+                  <Skeleton className="h-4 w-5/6 mb-2" />
+                  <Skeleton className="h-4 w-4/6" />
+                </div>
+                <div className="border-t p-4 flex justify-between">
+                  <Skeleton className="h-4 w-20" />
+                  <Skeleton className="h-9 w-24" />
+                </div>
               </CardContent>
-              <CardFooter className="flex justify-between border-t p-4">
-                <Skeleton className="h-4 w-20" />
-                <Skeleton className="h-9 w-24" />
-              </CardFooter>
             </Card>
           ))}
         </div>
       ) : filteredGigs.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredGigs.map((gig) => (
-            <Card key={gig.id} className="overflow-hidden">
-              <CardHeader className="pb-2">
-                <CardTitle className="flex items-center">
-                  {gig.title}
-                  {user && <GigApplication gigId={gig.id} />}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground line-clamp-3 mb-2">
-                  {gig.description}
-                </p>
-                <div className="flex flex-wrap gap-2 mb-2">
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
-                    {gig.category}
-                  </span>
-                </div>
-                <p className="text-sm font-medium">Posted by: {gig.createdBy}</p>
-              </CardContent>
-              <CardFooter className="flex justify-between border-t p-4">
-                <p className="font-semibold">{gig.credits} Credits</p>
-                {myGigs[gig.id] ? (
-                  <Link to={`/gig/${gig.id}/applications`}>
-                    <Button variant="secondary" className="flex items-center gap-1">
-                      <Briefcase className="h-4 w-4 mr-1" />
-                      Manage
-                    </Button>
-                  </Link>
-                ) : (
-                  <Link to={`/gig/${gig.id}`}>
-                    <Button>Apply</Button>
-                  </Link>
-                )}
-              </CardFooter>
-            </Card>
+            <GigCard 
+              key={gig.id} 
+              gig={gig} 
+              myGig={myGigs[gig.id]} 
+              onApply={handleApply}
+            />
           ))}
         </div>
       ) : (
